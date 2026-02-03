@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Deep Link Debugging - Payment Return</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+            background: #f5f5f5;
+            line-height: 1.6;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #007AFF;
+        }
+        .section h2 {
+            color: #007AFF;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+        .info-box {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .warning-box {
+            background: #f8d7da;
+            border: 1px solid #dc3545;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        .success-box {
+            background: #d4edda;
+            border: 1px solid #28a745;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+        }
+        button {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 5px;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:active {
+            transform: scale(0.98);
+        }
+        .code {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .test-result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+        .test-result.show {
+            display: block;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 3px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status.detected {
+            background: #28a745;
+            color: white;
+        }
+        .status.unknown {
+            background: #6c757d;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔗 Deep Link Debugging Tool</h1>
+        <p class="subtitle">Understanding why redirects fail and how to fix them</p>
+
+        <!-- Environment Detection -->
+        <div class="section">
+            <h2>🌐 Environment Detection</h2>
+            <div id="env-info">
+                <p><strong>User Agent:</strong> <span id="user-agent"></span></p>
+                <p><strong>Platform:</strong> <span id="platform"></span></p>
+                <p><strong>Browser:</strong> <span id="browser"></span></p>
+                <p><strong>In-App Browser:</strong> <span id="in-app" class="status unknown">Unknown</span></p>
+            </div>
+        </div>
+
+        <!-- Why Redirects Fail -->
+        <div class="section">
+            <h2>❌ Why Auto-Redirects Fail</h2>
+            <div class="warning-box">
+                <strong>Security Policy:</strong> Modern browsers block automatic redirects to custom URI schemes 
+                unless triggered by a direct user interaction (click, tap). This prevents malicious websites 
+                from hijacking apps.
+            </div>
+            <ul style="margin-left: 20px; margin-top: 10px;">
+                <li><strong>window.location.replace()</strong> - Blocked if not user-initiated</li>
+                <li><strong>window.location.href</strong> - Same restriction</li>
+                <li><strong>setTimeout/setInterval</strong> - Not considered user interaction</li>
+                <li><strong>In-App Browsers</strong> - May have additional restrictions</li>
+            </ul>
+        </div>
+
+        <!-- Platform Differences -->
+        <div class="section">
+            <h2>📱 Platform Differences</h2>
+            <div class="info-box">
+                <strong>Android Chrome:</strong> Requires user gesture. Auto-redirects blocked after ~1-2 seconds.
+            </div>
+            <div class="info-box">
+                <strong>iOS Safari:</strong> Very strict. Only direct user taps work reliably. 
+                Even programmatic clicks from setTimeout may fail.
+            </div>
+            <div class="info-box">
+                <strong>In-App Browsers (WebView/Expo):</strong> May intercept deep links differently. 
+                Some payment providers use custom browsers that handle redirects specially.
+            </div>
+        </div>
+
+        <!-- Test Methods -->
+        <div class="section">
+            <h2>🧪 Test Different Approaches</h2>
+            
+            <h3 style="margin-top: 15px; margin-bottom: 10px;">Method 1: Direct User Click (Most Reliable)</h3>
+            <button onclick="testDirectClick()">Click to Open App (Direct)</button>
+            <div id="result1" class="test-result"></div>
+
+            <h3 style="margin-top: 15px; margin-bottom: 10px;">Method 2: Immediate Redirect (May Fail)</h3>
+            <button onclick="testImmediateRedirect()">Test Immediate Redirect</button>
+            <div id="result2" class="test-result"></div>
+
+            <h3 style="margin-top: 15px; margin-bottom: 10px;">Method 3: Delayed Redirect (Usually Fails)</h3>
+            <button onclick="testDelayedRedirect()">Test Delayed Redirect (1s)</button>
+            <div id="result3" class="test-result"></div>
+
+            <h3 style="margin-top: 15px; margin-bottom: 10px;">Method 4: Hidden Iframe (Workaround)</h3>
+            <button onclick="testIframe()">Test Iframe Method</button>
+            <div id="result4" class="test-result"></div>
+
+            <h3 style="margin-top: 15px; margin-bottom: 10px;">Method 5: Intent URL (Android)</h3>
+            <button onclick="testIntent()">Test Android Intent</button>
+            <div id="result5" class="test-result"></div>
+        </div>
+
+        <!-- Best Practice Implementation -->
+        <div class="section">
+            <h2>✅ Recommended Solution</h2>
+            <div class="success-box">
+                <strong>Best Practice:</strong> Show a clear button immediately. Use direct user interaction. 
+                Provide fallback for when app is not installed.
+            </div>
+            <button onclick="openAppWithFallback()" style="background: #28a745; font-size: 18px; padding: 15px 30px;">
+                ✅ Return to App (Recommended)
+            </button>
+            <div id="result-best" class="test-result"></div>
+        </div>
+
+        <!-- Code Examples -->
+        <div class="section">
+            <h2>💻 Code Examples</h2>
+            <h3 style="margin-top: 15px; margin-bottom: 10px;">❌ This Fails (Your Current Code):</h3>
+            <div class="code">
+&lt;script&gt;
+  setTimeout(() => {
+    window.location.replace("myapp://payment/success");
+  }, 1000);
+&lt;/script&gt;
+            </div>
+
+            <h3 style="margin-top: 15px; margin-bottom: 10px;">✅ This Works (Recommended):</h3>
+            <div class="code">
+&lt;button onclick="openApp()"&gt;Return to App&lt;/button&gt;
+&lt;script&gt;
+  function openApp() {
+    const deepLink = "myapp://payment/success";
+    window.location.href = deepLink;
+    
+    // Fallback: if app doesn't open, redirect to app store
+    setTimeout(() => {
+      window.location.href = "https://apps.apple.com/app/your-app";
+      // or for Android: "https://play.google.com/store/apps/details?id=your.package"
+    }, 2000);
+  }
+&lt;/script&gt;
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Environment Detection
+        function detectEnvironment() {
+            const ua = navigator.userAgent;
+            document.getElementById('user-agent').textContent = ua.substring(0, 80) + '...';
+            document.getElementById('platform').textContent = navigator.platform;
+            
+            // Detect browser
+            let browser = 'Unknown';
+            if (ua.includes('Chrome') && !ua.includes('Edg')) browser = 'Chrome';
+            else if (ua.includes('Safari') && !ua.includes('Chrome')) browser = 'Safari';
+            else if (ua.includes('Firefox')) browser = 'Firefox';
+            else if (ua.includes('Edg')) browser = 'Edge';
+            document.getElementById('browser').textContent = browser;
+            
+            // Detect in-app browser
+            const inAppBrowser = 
+                ua.includes('wv') || // Android WebView
+                ua.includes('WebView') ||
+                window.navigator.standalone !== undefined || // iOS standalone
+                window.matchMedia('(display-mode: standalone)').matches;
+            
+            const inAppEl = document.getElementById('in-app');
+            if (inAppBrowser) {
+                inAppEl.textContent = 'Yes';
+                inAppEl.className = 'status detected';
+            } else {
+                inAppEl.textContent = 'No';
+                inAppEl.className = 'status unknown';
+            }
+        }
+
+        // Deep link constant
+        const DEEP_LINK = "myapp://payment/success";
+        const ANDROID_INTENT = "intent://payment/success#Intent;scheme=myapp;package=com.yourapp.package;end";
+        const FALLBACK_URL = "https://apps.apple.com/app/your-app-id"; // Change this
+
+        // Method 1: Direct Click (Most Reliable)
+        function testDirectClick() {
+            const result = document.getElementById('result1');
+            result.className = 'test-result show';
+            result.innerHTML = '<div class="info-box">Attempting to open app via direct click...</div>';
+            
+            try {
+                window.location.href = DEEP_LINK;
+                result.innerHTML = '<div class="success-box">✅ Deep link triggered. If app opened, this worked!</div>';
+            } catch (e) {
+                result.innerHTML = '<div class="warning-box">❌ Error: ' + e.message + '</div>';
+            }
+        }
+
+        // Method 2: Immediate Redirect (May work on some browsers)
+        function testImmediateRedirect() {
+            const result = document.getElementById('result2');
+            result.className = 'test-result show';
+            result.innerHTML = '<div class="info-box">Testing immediate redirect...</div>';
+            
+            window.location.replace(DEEP_LINK);
+            result.innerHTML = '<div class="warning-box">⚠️ This usually fails due to security policies. Check if app opened.</div>';
+        }
+
+        // Method 3: Delayed Redirect (Usually Fails)
+        function testDelayedRedirect() {
+            const result = document.getElementById('result3');
+            result.className = 'test-result show';
+            result.innerHTML = '<div class="info-box">Testing delayed redirect (1 second)...</div>';
+            
+            setTimeout(() => {
+                window.location.replace(DEEP_LINK);
+                result.innerHTML = '<div class="warning-box">❌ This almost always fails. setTimeout is not considered user interaction.</div>';
+            }, 1000);
+        }
+
+        // Method 4: Hidden Iframe (Workaround)
+        function testIframe() {
+            const result = document.getElementById('result4');
+            result.className = 'test-result show';
+            result.innerHTML = '<div class="info-box">Testing iframe method...</div>';
+            
+            try {
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.src = DEEP_LINK;
+                document.body.appendChild(iframe);
+                
+                setTimeout(() => {
+                    document.body.removeChild(iframe);
+                    result.innerHTML = '<div class="info-box">⚠️ Iframe removed. This method has mixed results across browsers.</div>';
+                }, 1000);
+            } catch (e) {
+                result.innerHTML = '<div class="warning-box">❌ Error: ' + e.message + '</div>';
+            }
+        }
+
+        // Method 5: Android Intent URL
+        function testIntent() {
+            const result = document.getElementById('result5');
+            result.className = 'test-result show';
+            
+            const isAndroid = /Android/i.test(navigator.userAgent);
+            if (!isAndroid) {
+                result.innerHTML = '<div class="warning-box">⚠️ Intent URLs only work on Android</div>';
+                return;
+            }
+            
+            result.innerHTML = '<div class="info-box">Testing Android Intent URL...</div>';
+            window.location.href = ANDROID_INTENT;
+        }
+
+        // Best Practice: Open with Fallback
+        function openAppWithFallback() {
+            const result = document.getElementById('result-best');
+            result.className = 'test-result show';
+            result.innerHTML = '<div class="info-box">Opening app with fallback mechanism...</div>';
+            
+            const isAndroid = /Android/i.test(navigator.userAgent);
+            const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+            
+            // Try deep link
+            let deepLinkUrl = DEEP_LINK;
+            if (isAndroid) {
+                // Android Intent URL is more reliable
+                deepLinkUrl = ANDROID_INTENT;
+            }
+            
+            window.location.href = deepLinkUrl;
+            
+            // Fallback: If app doesn't open within 2 seconds, redirect to app store
+            let fallbackTriggered = false;
+            const fallbackTimer = setTimeout(() => {
+                if (!fallbackTriggered) {
+                    fallbackTriggered = true;
+                    result.innerHTML = '<div class="warning-box">⚠️ App may not be installed. Redirecting to app store...</div>';
+                    
+                    if (isIOS) {
+                        window.location.href = "https://apps.apple.com/app/your-app-id";
+                    } else if (isAndroid) {
+                        window.location.href = "https://play.google.com/store/apps/details?id=com.yourapp.package";
+                    } else {
+                        result.innerHTML = '<div class="info-box">ℹ️ Please install the app manually</div>';
+                    }
+                }
+            }, 2000);
+            
+            // If page becomes hidden, app likely opened (cancel fallback)
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden && !fallbackTriggered) {
+                    clearTimeout(fallbackTimer);
+                    result.innerHTML = '<div class="success-box">✅ App opened successfully!</div>';
+                }
+            });
+            
+            // Also listen for blur (user switched apps)
+            window.addEventListener('blur', () => {
+                if (!fallbackTriggered) {
+                    clearTimeout(fallbackTimer);
+                    result.innerHTML = '<div class="success-box">✅ App opened successfully!</div>';
+                }
+            });
+        }
+
+        // Initialize
+        detectEnvironment();
+    </script>
+</body>
+</html>
+
