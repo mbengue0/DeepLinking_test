@@ -52,11 +52,19 @@ function openApp() {
   window.location.href = "myapp://payment/success";
 }
 
-// ❌ BAD: Auto-redirect
+// ❌ BAD: Auto-redirect (blocked by browsers)
 setTimeout(() => {
   window.location.replace("myapp://payment/success");
 }, 1000);
 ```
+
+### Important: Expo Go Testing
+
+If you're testing with **Expo Go** on iOS:
+- Expo Go uses `exp://` scheme, not `myapp://`
+- Use: `exp://localhost:8081/--/payment/success`
+- WebView in Expo Go may have additional restrictions
+- See `expo-go-deeplink-guide.md` for details
 
 ### 2. Provide Clear UI
 
